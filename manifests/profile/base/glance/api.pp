@@ -47,9 +47,9 @@
 #   This is set by t-h-t.
 #   Defaults to hiera('glance_api_network', undef)
 #
-# [*glance_nfs_enabled*]
-#   (Optional) Whether to use NFS mount as 'file' backend storage location.
-#   Defaults to false
+# [*netapp_share_location*]
+#   (Optional) Netapp share to mount for image storage(when GlanceNetappNfsEnabled is true)
+#   Defaults to undef
 #
 # [*step*]
 #   (Optional) The current step in deployment. See tripleo-heat-templates
@@ -128,7 +128,7 @@ class tripleo::profile::base::glance::api (
   $enable_internal_tls     = hiera('enable_internal_tls', false),
   $glance_backend          = downcase(hiera('glance_backend', 'swift')),
   $glance_network          = hiera('glance_api_network', undef),
-  $glance_nfs_enabled      = false,
+  $netapp_share_location   = undef,
   $step                    = Integer(hiera('step')),
   $oslomsg_rpc_proto       = hiera('oslo_messaging_rpc_scheme', 'rabbit'),
   $oslomsg_rpc_hosts       = any2array(hiera('oslo_messaging_rpc_node_names', undef)),
@@ -153,8 +153,20 @@ class tripleo::profile::base::glance::api (
     $sync_db = false
   }
 
-  if $step >= 1 and $glance_nfs_enabled {
-    include ::tripleo::glance::nfs_mount
+  if $netapp_share_location {
+    $netapp_share = sprintf("nfs://%s", regsubst($netapp_share_location, ':', '', 'G'))
+    $filesystem_store_metadata_file = '/etc/glance/glance-metadata-file.conf'
+    $show_image_direct_url = true
+    $show_multiple_locations = true
+    file { $filesystem_store_metadata_file:
+      ensure  => file,
+      mode    => '0644',
+      content => inline_template("{\n\s\s 'share_location' : '${netapp_share}',\n\s\s 'mount_point' : '/var/lib/glance/images',\n\s\s 'type' : 'nfs'\n}"),
+    }
+  } else {
+    $show_image_direct_url = false
+    $show_multiple_locations = false
+    $filesystem_store_metadata_file = None
   }
 
   if $step >= 4 or ($step >= 3 and $sync_db) {
@@ -204,6 +216,9 @@ class tripleo::profile::base::glance::api (
     class { '::glance::api':
       stores  => $glance_store,
       sync_db => $sync_db,
+      show_image_direct_url => $show_image_direct_url,
+      show_multiple_locations => $show_multiple_locations,
+      filesystem_store_metadata_file => $filesystem_store_metadata_file,
     }
     $oslomsg_rpc_use_ssl_real = sprintf('%s', bool2num(str2bool($oslomsg_rpc_use_ssl)))
     $oslomsg_notify_use_ssl_real = sprintf('%s', bool2num(str2bool($oslomsg_notify_use_ssl)))
