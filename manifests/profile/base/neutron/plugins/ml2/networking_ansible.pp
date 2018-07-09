@@ -1,4 +1,4 @@
-# Copyright 2016 Red Hat, Inc.
+# Copyright 2018 Red Hat, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -12,9 +12,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 #
-# == Class: tripleo::profile::base::gnocchi
+# == Class:tripleo::profile::base::neutron::plugins::ml2::networking_ansible
 #
-# Gnocchi profile for tripleo
+# Neutron networking-ansible ML2 plugin profile for tripleo
 #
 # === Parameters
 #
@@ -23,13 +23,14 @@
 #   for more details.
 #   Defaults to hiera('step')
 #
-class tripleo::profile::base::gnocchi (
-  $step = Integer(hiera('step')),
+
+class tripleo::profile::base::neutron::plugins::ml2::networking_ansible(
+  $step               = Integer(hiera('step'))
 ) {
-  if $step >= 3 {
-    include ::gnocchi
-    include ::gnocchi::config
-    include ::gnocchi::cors
-    include ::gnocchi::client
+
+  include ::tripleo::profile::base::neutron
+
+  if $step >= 4 {
+    include ::neutron::plugins::ml2::networking_ansible
   }
 }

@@ -147,6 +147,11 @@ class tripleo::profile::base::manila::share (
         command => "setfacl -m u:manila:r-- ${keyring_path}",
         unless  => "getfacl ${keyring_path} | grep -q user:manila:r--",
       }
+      -> exec{ "exec-setfacl-${cephfs_auth_id}-mask":
+        path    => ['/bin', '/usr/bin' ],
+        command => "setfacl -m m::r ${keyring_path}",
+        unless  => "getfacl ${keyring_path} | grep -q mask::r",
+      }
     }
 
     # manila netapp:
@@ -198,6 +203,9 @@ class tripleo::profile::base::manila::share (
         unity_server_meta_pool       => hiera('manila::backend::dellemc_unity::unity_server_meta_pool'),
         unity_share_data_pools       => hiera('manila::backend::dellemc_unity::unity_share_data_pools'),
         unity_ethernet_ports         => hiera('manila::backend::dellemc_unity::unity_ethernet_ports'),
+        network_plugin_ipv6_enabled  => hiera('manila::backend::dellemc_unity::network_plugin_ipv6_enabled'),
+        emc_ssl_cert_verify          => hiera('manila::backend::dellemc_unity::emc_ssl_cert_verify'),
+        emc_ssl_cert_path            => hiera('manila::backend::dellemc_unity::emc_ssl_cert_path'),
       }
     }
     # manila vnx:
@@ -212,6 +220,9 @@ class tripleo::profile::base::manila::share (
         vnx_server_container         => hiera('manila::backend::dellemc_vnx::vnx_server_container'),
         vnx_share_data_pools         => hiera('manila::backend::dellemc_vnx::vnx_share_data_pools'),
         vnx_ethernet_ports           => hiera('manila::backend::dellemc_vnx::vnx_ethernet_ports'),
+        network_plugin_ipv6_enabled  => hiera('manila::backend::dellemc_vnx::network_plugin_ipv6_enabled'),
+        emc_ssl_cert_verify          => hiera('manila::backend::dellemc_vnx::emc_ssl_cert_verify'),
+        emc_ssl_cert_path            => hiera('manila::backend::dellemc_vnx::emc_ssl_cert_path'),
       }
     }
 

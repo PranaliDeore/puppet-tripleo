@@ -341,6 +341,10 @@
 #  (optional) Enable or not OpenDaylight binding
 #  Defaults to hiera('opendaylight_api_enabled', false)
 #
+# [*openshift_master*]
+#  (optional) Enable or not Kubernetes API binding
+#  Defaults to hiera('openshift_master_enabled', false)
+#
 # [*ovn_dbs*]
 #  (optional) Enable or not OVN northd binding
 #  Defaults to hiera('ovn_dbs_enabled', false)
@@ -426,6 +430,15 @@
 #  (optional) Specify the network keystone_public is running on.
 #  Defaults to hiera('keystone_network', undef)
 #
+# [*keystone_sticky_sessions*]
+#  (optional) Use cookie-based session persistence for the Keystone
+#  public API.
+#  Defaults to hiera('keystone_sticky_sessions', false)
+#
+# [*keystone_session_cookie*]
+#  (optional) Use a specified name for the Keystone sticky session cookie.
+#  Defaults to hiera('keystone_session_cookie', 'KEYSTONESESSION')
+#
 # [*manila_network*]
 #  (optional) Specify the network manila is running on.
 #  Defaults to hiera('manila_api_network', undef)
@@ -473,6 +486,10 @@
 # [*opendaylight_network*]
 #  (optional) Specify the network opendaylight is running on.
 #  Defaults to hiera('opendaylight_api_network', undef)
+#
+# [*openshift_master_network*]
+#  (optional) Specify the network openshift_master is running on.
+#  Defaults to hiera('openshift_master_network', undef)
 #
 # [*panko_network*]
 #  (optional) Specify the network panko is running on.
@@ -547,6 +564,8 @@
 #    'nova_novnc_ssl_port' (Defaults to 13080)
 #    'octavia_api_port' (Defaults to 9876)
 #    'octavia_api_ssl_port' (Defaults to 13876)
+#    'openshift_master_port' (Defaults to 6444)
+#    'openshift_master_ssl_port' (Defaults to 13443)
 #    'opendaylight_api_port' (Defaults to 8081)
 #    'panko_api_port' (Defaults to 8977)
 #    'panko_api_ssl_port' (Defaults to 13977)
@@ -634,6 +653,7 @@ class tripleo::haproxy (
   $mysql_clustercheck          = false,
   $mysql_max_conn              = undef,
   $mysql_member_options        = undef,
+  $openshift_master            = hiera('openshift_master_enabled', false),
   $rabbitmq                    = false,
   $etcd                        = hiera('etcd_enabled', false),
   $docker_registry             = hiera('enable_docker_registry', false),
@@ -665,6 +685,8 @@ class tripleo::haproxy (
   $kubernetes_master_network    = hiera('kubernetes_master_network', undef),
   $keystone_admin_network      = hiera('keystone_admin_api_network', undef),
   $keystone_public_network     = hiera('keystone_public_api_network', undef),
+  $keystone_sticky_sessions    = hiera('keystone_sticky_sessions', false),
+  $keystone_session_cookie     = hiera('keystone_session_cookie,', 'KEYSTONESESSION'),
   $manila_network              = hiera('manila_api_network', undef),
   $mistral_network             = hiera('mistral_api_network', undef),
   $neutron_network             = hiera('neutron_api_network', undef),
@@ -674,6 +696,7 @@ class tripleo::haproxy (
   $nova_placement_network      = hiera('nova_placement_network', undef),
   $octavia_network             = hiera('octavia_api_network', undef),
   $opendaylight_network        = hiera('opendaylight_api_network', undef),
+  $openshift_master_network    = hiera('openshift_master_network', undef),
   $panko_network               = hiera('panko_api_network', undef),
   $ovn_dbs_network             = hiera('ovn_dbs_network', undef),
   $ec2_api_network             = hiera('ec2_api_network', undef),
@@ -737,6 +760,8 @@ class tripleo::haproxy (
     octavia_api_ssl_port => 13876,
     opendaylight_api_port => 8081,
     opendaylight_ws_port => 8185,
+    openshift_master_port => 8443,
+    openshift_master_ssl_port => 18443,
     panko_api_port => 8977,
     panko_api_ssl_port => 13977,
     ovn_nbdb_port => 6641,
@@ -847,7 +872,8 @@ class tripleo::haproxy (
     'option'       => [ 'httpchk', 'httplog', ],
     'http-request' => [
       'set-header X-Forwarded-Proto https if { ssl_fc }',
-      'set-header X-Forwarded-Proto http if !{ ssl_fc }'],
+      'set-header X-Forwarded-Proto http if !{ ssl_fc }',
+      'set-header X-Forwarded-Port %[dst_port]'],
   }
   Tripleo::Haproxy::Endpoint {
     haproxy_listen_bind_param   => $haproxy_listen_bind_param,
@@ -907,6 +933,8 @@ class tripleo::haproxy (
       listen_options    => merge($default_listen_options, $keystone_listen_opts),
       public_ssl_port   => $ports[keystone_public_api_ssl_port],
       service_network   => $keystone_public_network,
+      sticky_sessions   => $keystone_sticky_sessions,
+      session_cookie    => $keystone_session_cookie,
       member_options    => union($haproxy_member_options, $internal_tls_member_options),
     }
   }
@@ -1615,6 +1643,21 @@ class tripleo::haproxy (
       public_ssl_port => $ports[kubernetes_master_ssl_port],
       service_network => $kubernetes_master_network,
       listen_options  => {
+        'balance' => 'roundrobin',
+      }
+    }
+  }
+
+  if $openshift_master {
+    ::tripleo::haproxy::endpoint { 'openshift-master':
+      public_virtual_ip => $public_virtual_ip,
+      internal_ip       => hiera('openshift_master_vip', $controller_virtual_ip),
+      service_port      => $ports[openshift_master_port],
+      ip_addresses      => hiera('openshift_master_node_ips', $controller_hosts_real),
+      server_names      => hiera('openshift_master_node_names', $controller_hosts_names_real),
+      public_ssl_port   => $ports[openshift_master_ssl_port],
+      service_network   => $openshift_master_network,
+      listen_options    => {
         'balance' => 'roundrobin',
       }
     }

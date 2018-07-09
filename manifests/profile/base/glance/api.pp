@@ -47,10 +47,6 @@
 #   This is set by t-h-t.
 #   Defaults to hiera('glance_api_network', undef)
 #
-# [*glance_nfs_enabled*]
-#   (Optional) Whether to use NFS mount as 'file' backend storage location.
-#   Defaults to false
-#
 # [*step*]
 #   (Optional) The current step in deployment. See tripleo-heat-templates
 #   for more details.
@@ -128,7 +124,6 @@ class tripleo::profile::base::glance::api (
   $enable_internal_tls     = hiera('enable_internal_tls', false),
   $glance_backend          = downcase(hiera('glance_backend', 'swift')),
   $glance_network          = hiera('glance_api_network', undef),
-  $glance_nfs_enabled      = false,
   $step                    = Integer(hiera('step')),
   $oslomsg_rpc_proto       = hiera('oslo_messaging_rpc_scheme', 'rabbit'),
   $oslomsg_rpc_hosts       = any2array(hiera('oslo_messaging_rpc_node_names', undef)),
@@ -151,10 +146,6 @@ class tripleo::profile::base::glance::api (
     $sync_db = true
   } else {
     $sync_db = false
-  }
-
-  if $step >= 1 and $glance_nfs_enabled {
-    include ::tripleo::glance::nfs_mount
   }
 
   if $step >= 4 or ($step >= 3 and $sync_db) {
@@ -189,6 +180,11 @@ class tripleo::profile::base::glance::api (
             path    => ['/bin', '/usr/bin'],
             command => "setfacl -m u:glance:r-- /etc/ceph/ceph.client.${glance_rbd_client_name}.keyring",
             unless  => "getfacl /etc/ceph/ceph.client.${glance_rbd_client_name}.keyring | grep -q user:glance:r--",
+          }
+          -> exec{ "exec-setfacl-${glance_rbd_client_name}-glance-mask":
+            path    => ['/bin', '/usr/bin'],
+            command => "setfacl -m m::r /etc/ceph/ceph.client.${glance_rbd_client_name}.keyring",
+            unless  => "getfacl /etc/ceph/ceph.client.${glance_rbd_client_name}.keyring | grep -q mask::r",
           }
         }
         'cinder': { $backend_store = 'cinder' }
