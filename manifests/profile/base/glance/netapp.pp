@@ -1,4 +1,4 @@
-# Copyright 2016 Red Hat, Inc.
+# Copyright 2018 Red Hat, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -37,7 +37,7 @@
 #   Defaults to hiera('step')
 
 class tripleo::profile::base::glance::netapp (
-  $netapp_share                   = undef,
+  $netapp_share,
   $netapp_nfs_mount               = '/var/lib/glance/images',
   $filesystem_store_metadata_file = '/etc/glance/glance-metadata-file.conf',
   $step                           = Integer(hiera('step')),
@@ -45,12 +45,15 @@ class tripleo::profile::base::glance::netapp (
 
 
   if ($step >= 4) {
-    if $netapp_share {
-      $netapp_share_location = sprintf("nfs://%s", regsubst($netapp_share, ':', '', 'G'))
-      file { $filesystem_store_metadata_file:
-        ensure  => file,
-        content => inline_template("{\n\s\s 'share_location' : '${netapp_share_location}',\n\s\s 'mount_point' : '${netapp_nfs_mount}',\n\s\s 'type' : 'nfs'\n}"),
-      }
+    $netapp_share_location = sprintf("nfs://%s", regsubst($netapp_share, ':', '', 'G'))
+    $metadata = {
+                   "id"             => "FlexPod1",
+                   "share_location" => "${netapp_share_location}",
+                   "mountpoint"     => "${netapp_nfs_mount}",
+                   "type"           => "nfs", }
+    file { $filesystem_store_metadata_file:
+      ensure  => file,
+      content => inline_template('<%= require "json"; JSON.dump(@metadata) %>'),
     }
   }
 }
